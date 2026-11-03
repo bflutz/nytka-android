@@ -117,7 +117,7 @@ services, so it runs on a phone without them. Each release has one file, `nytka-
 
 - **Obtainium** installs it and offers every new release. In [Obtainium](https://github.com/ImranR98/Obtainium) tap
   **Add app**, paste `https://github.com/nytka-app/android` and tap **Add**; the default settings pick the one APK.
-  To pin the file, set the APK filter to `^nytka-.*\.apk$`. The tutorial has the [details](docs/tutorial.md#install-with-obtainium).
+  To pin the file, set the APK filter to `^nytka-.*\.apk$`. On the phone, `obtainium://add/https://github.com/nytka-app/android` opens Add app with the address filled in. The tutorial has the [details](docs/tutorial.md#install-with-obtainium).
 - **IzzyOnDroid** reads the same APK from Releases. Nytka is not listed there yet; the
   [request](docs/fdroid/izzyondroid-request.md) is drafted and not sent.
 - **F-Droid** builds apps from source. Nytka is not on F-Droid yet; the [draft](docs/fdroid/README.md) is not sent.
@@ -161,7 +161,7 @@ clients; `:app` is the Compose UI and the background services. Four rules hold e
   [How Nytka compares](docs/explanation/comparison.md)
 - [Developer mode](docs/reference/developer-mode.md): measurements, server settings, tokens, webhooks
 - [Build from source](docs/how-to/build-from-source.md) · [Contributing](CONTRIBUTING.md) ·
-  [F-Droid draft](docs/fdroid/README.md)
+  [F-Droid, IzzyOnDroid, Obtainium](docs/fdroid/README.md)
 - Specs and plans: [people](docs/specs/people.md), [speech kind](docs/specs/speech-kind.md),
   [tags](docs/specs/tags.md), [plans](docs/plans/); what each version must do is in the
   [server's specs](https://github.com/nytka-app/server/tree/main/docs/specs)
