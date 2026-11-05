@@ -1,0 +1,68 @@
+# HQ build: an issue labelled `hq-build` becomes a branch with the change on it.
+#
+# How it works: Barend (from his HQ dashboard, or by hand on GitHub) labels an issue `hq-build`.
+#   Barend's own build machine at home (self-hosted runner `homley-build`, CT 210 on Homley) runs Claude Code. It reads
+#   the issue, makes the change on a new hq/... branch off main, checks that the oss variant still compiles and its unit
+#   tests pass, pushes the branch and comments a "Create PR" link on the issue. A person opens and merges the pull
+#   request; the repo's normal ci.yml then runs the full check (lint, ktlint, detekt, both flavors) on GitHub's runners.
+# This workflow never merges, never signs or publishes an APK.
+#
+# There is no Claude or API secret in this repository: Claude runs through the build machine's own login.
+# The build machine refuses any other workflow file or event, has a daily job cap and a kill switch, and is walled
+# off from the network it sits on. Design: bflutz/herbert-homley docs/hq-plan.md, section 13.
+# Project plan: bflutz/nytka-server, docs/voice-recorder-plan.md (branch phase1 until merged).
+name: HQ build
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write        # push the hq/... branch
+  issues: write          # progress comment on the issue
+  pull-requests: read
+
+concurrency:
+  group: hq-build-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Only Barend (either of his GitHub logins) may start a build for now (the HQ GitHub App joins this list when it exists).
+    if: github.event.label.name == 'hq-build' && (github.event.sender.login == 'bflutz' || github.event.sender.login == 'BarendL')
+    runs-on: [self-hosted, homley-build]
+    timeout-minutes: 90
+    env:
+      ANTHROPIC_BASE_URL: http://127.0.0.1:9101   # the build machine's own Claude bridge (loopback only)
+      # The build machine has 3 GiB of RAM and runs one job at a time: keep Gradle small, no daemon.
+      GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m -Dkotlin.compiler.execution.strategy=in-process
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 50
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # The Android SDK (the build machine has none; kept in the runner's tool cache between jobs).
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+
+      # Also validates the Gradle wrapper checksum.
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - id: claude
+        uses: anthropics/claude-code-action@ae68417a745a5df4b2124873632bd73a2255e6f6 # v1
+        with:
+          anthropic_api_key: via-homley-bridge     # not a key: the bridge holds the login
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          label_trigger: hq-build
+          base_branch: main
+          branch_prefix: hq/
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 150
+            --allowedTools "Bash(./gradlew:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(ls:*),Bash(cd:*)"
+            --append-system-prompt "You work in Nytka's Android app (Kotlin, Jetpack Compose, Room, WorkManager), forked by Barend for his personal voice recorder on a Samsung Galaxy S25: the phone records 16 kHz mono Opus, queues it and uploads it to his home server Homley, which confirms before the phone deletes it. Read CLAUDE.md and CONTRIBUTING.md first. The project plan is https://github.com/bflutz/nytka-server/blob/phase1/docs/voice-recorder-plan.md (quoted in the issue where it matters). Rules: no on-phone speech-to-text, no cloud calls, no Google services in the oss flavor, never add secrets, keystores or signing config, never change .github/ or the release setup unless the issue asks for it. Before you finish: ./gradlew :app:compileOssDebugKotlin testOssDebugUnitTest ktlintCheck must pass (run Gradle tasks one at a time: this machine has 3 GiB of RAM). Lint and the play flavor run in GitHub's ci.yml on the pull request; say plainly what you could not run. Keep commits small with clear messages. In your final comment, list what changed, what you checked, and anything you could not do."
